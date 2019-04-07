@@ -5,6 +5,13 @@ import { forEachValue, isObject, isPromise, assert, partial } from './util'
 
 let Vue // bind on install
 
+/*
+  Store类的定义：
+  创建实例对象的过程：
+    1.根据开发者传来的配置options定义了一些属性和方法：
+      _modules，_actions，_watcherVM，_mutations，_subscribers，dispatch，commit，
+      state存储器属性，watch等等。
+ */
 export class Store {
   constructor (options = {}) {
     // Auto install if it is not done yet and `window` has `Vue`.
@@ -493,7 +500,11 @@ function unifyObjectStyle (type, payload, options) {
   return { type, payload, options }
 }
 
+// 安装vuex插件的方法
+// 1.使用全局变量Vue存储Vue构造函数，便于其他地方使用，避免了引入，减少了项目的体积
+// 2.全局（在每一个Vue实例中）注入一个beforeCreate钩子函数，在该钩子函数中进行初始化的工作
 export function install (_Vue) {
+  // 确保vuex只能安装一次
   if (Vue && _Vue === Vue) {
     if (process.env.NODE_ENV !== 'production') {
       console.error(

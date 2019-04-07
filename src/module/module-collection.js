@@ -4,6 +4,8 @@ import { assert, forEachValue } from '../util'
 export default class ModuleCollection {
   constructor (rawRootModule) {
     // register root module (Vuex.Store options)
+    // 参数： rawRootModule：options（用户的vuex配置）
+    // 注册根模块
     this.register([], rawRootModule, false)
   }
 
@@ -25,6 +27,7 @@ export default class ModuleCollection {
     update([], this.root, rawRootModule)
   }
 
+  // 参数：path：构建模块树时维持的路径
   register (path, rawModule, runtime = true) {
     if (process.env.NODE_ENV !== 'production') {
       assertRawModule(path, rawModule)
@@ -107,6 +110,7 @@ function assertRawModule (path, rawModule) {
 
     const assertOptions = assertTypes[key]
 
+    // forEachValue的作用：遍历一个对象，把value,key作为参数执行第二个函数参数
     forEachValue(rawModule[key], (value, type) => {
       assert(
         assertOptions.assert(value),
