@@ -1,6 +1,9 @@
 import Module from './module'
 import { assert, forEachValue } from '../util'
 
+// 定义构建模块树的类
+// ModuleCollection类的作用是根据开发者定义的options中的模块，
+// 构建一个模块树，每个模块中由_children属性收集着所有的子模块
 export default class ModuleCollection {
   constructor (rawRootModule) {
     // register root module (Vuex.Store options)
@@ -9,7 +12,14 @@ export default class ModuleCollection {
     this.register([], rawRootModule, false)
   }
 
+  // 该函数返回一个模块
   get (path) {
+    // reduce函数函数： 
+    // 1.function(total，currentValue, currentIndex, arr){}
+    //    total: 初始值，或者计算结束后的返回值
+    // 2.初始值（传递给1中function的第一个参数）
+    // 3. 如果path是一个空数组，那么path.reduce()的值为初始值，不会执行第一个函数参数
+    // 4.如果path是一个空数组，并且没有提供初始值的话，会报错
     return path.reduce((module, key) => {
       return module.getChild(key)
     }, this.root)
@@ -27,28 +37,36 @@ export default class ModuleCollection {
     update([], this.root, rawRootModule)
   }
 
-  // 参数：path：构建模块树时维持的路径
+  // 参数：path：构建模块树时维持的路径, rawModule: 开发者的模块配置，runtime：是否是
+  // 运行时创建的模块
   register (path, rawModule, runtime = true) {
     if (process.env.NODE_ENV !== 'production') {
+      // 生产环境下，对开发者定义的actions,getters,mutactions中的项进行类型检查
       assertRawModule(path, rawModule)
     }
 
+    // 创建一个模块
     const newModule = new Module(rawModule, runtime)
     if (path.length === 0) {
       this.root = newModule
     } else {
+      // path.slice(0, -1)：path中开始到倒数第一个元素的全部元素，即不包含最后一个元素
       const parent = this.get(path.slice(0, -1))
       parent.addChild(path[path.length - 1], newModule)
     }
 
     // register nested modules
+    // 注册嵌套模块
     if (rawModule.modules) {
       forEachValue(rawModule.modules, (rawChildModule, key) => {
+        // concat()的参数可以是一个数组，也可以是一个具体的值，效果都是返回一个
+        // 新的数组，新数组中的值为path中的项，和concat中的项
         this.register(path.concat(key), rawChildModule, runtime)
       })
     }
   }
 
+  // 取消注册一个模块
   unregister (path) {
     const parent = this.get(path.slice(0, -1))
     const key = path[path.length - 1]
@@ -104,6 +122,9 @@ const assertTypes = {
   actions: objectAssert
 }
 
+// 该函数的作用是：
+// 对于开发者定义的getters，mutations，actions中的项进行类型检查，
+// 如果不是希望的类型，会抛出一个Error实例
 function assertRawModule (path, rawModule) {
   Object.keys(assertTypes).forEach(key => {
     if (!rawModule[key]) return
@@ -112,14 +133,19 @@ function assertRawModule (path, rawModule) {
 
     // forEachValue的作用：遍历一个对象，把value,key作为参数执行第二个函数参数
     forEachValue(rawModule[key], (value, type) => {
+      // assert函数的作用是进行错误信息的打印
       assert(
-        assertOptions.assert(value),
+        assertOptions.assert(value), // 返回boolean,是否希望的类型
         makeAssertionMessage(path, key, type, value, assertOptions.expected)
       )
     })
   })
 }
 
+// 输出定义类型错误的消息
+// key: getters,mutations,actions,
+// type、value: 开发者定义的getters,mutations,actions中的键、值
+// expected：希望的；类型
 function makeAssertionMessage (path, key, type, value, expected) {
   let buf = `${key} should be ${expected} but "${key}.${type}"`
   if (path.length > 0) {

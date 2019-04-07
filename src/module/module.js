@@ -1,6 +1,15 @@
 import { forEachValue } from '../util'
 
 // Base data struct for store's module, package with some attribute and method
+// 创建模块的类定义：
+// 构造函数： 定义模块的相关属性和方法：
+//  _children，_rawModule，state，addChild，removeChild，update，forEachChild，
+// forEachGetter，forEachMutation，forEachAction等等。
+// state: 一个对象，开发者配置的对象或者空对象。作用：存储组件的共享状态
+// _children： 子模块集合
+// forEachChild： 提供遍历该模块所有子模块的方法，
+// forEachGetter，forEachMutation，forEachAction：提供遍历该模块getters,mutactions,actions
+// 的接口。
 export default class Module {
   constructor (rawModule, runtime) {
     this.runtime = runtime
@@ -30,6 +39,8 @@ export default class Module {
     return this._children[key]
   }
 
+  // 提供更新该模块的namespaced，actions，mutations，getters的方法。
+  // 即：可以使用该方法开重新赋值该模块的以上的属性的值
   update (rawModule) {
     this._rawModule.namespaced = rawModule.namespaced
     if (rawModule.actions) {
