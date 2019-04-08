@@ -68,6 +68,7 @@ export class Store {
 
     // initialize the store vm, which is responsible for the reactivity
     // (also registers _wrappedGetters as computed properties)
+    // 初始化store._vm,该属性负责state的响应式
     resetStoreVM(this, state)
 
     // apply plugins
@@ -259,14 +260,21 @@ function resetStore (store, hot) {
   resetStoreVM(store, state, hot)
 }
 
+// 该函数的实际作用是建立getters和state的联系，并且希望getters依赖的state
+// 能够被缓存，只有当值发生的时候，才进行重新计算，所以使用了Vue中的计算属性
+// 来实现。
+
 function resetStoreVM (store, state, hot) {
   const oldVm = store._vm
 
   // bind store public getters
   store.getters = {}
   const wrappedGetters = store._wrappedGetters
+  // 创建一个Vue的计算属性
   const computed = {}
+  // 遍历store._wrappedGetters，
   forEachValue(wrappedGetters, (fn, key) => {
+    // fn => wrappedGetter,
     // use computed to leverage its lazy-caching mechanism
     // direct inline function use will lead to closure preserving oldVm.
     // using partial to return function with only arguments preserved in closure enviroment.
@@ -307,7 +315,8 @@ function resetStoreVM (store, state, hot) {
   }
 }
 
-// 定义安装模块的函数
+// 定义安装模块的函数，实际上是对模块的state，getters，actions，mutations进行初始化工作
+// 并且递归安装所有的子模块
 /*
   参数： store: Store实例对象，rootState: 根模块的state, path:模块访问的路径，module：当前模块
           hot: 是否热更新
@@ -334,9 +343,11 @@ function installModule (store, rootState, path, module, hot) {
     })
   }
 
-  // 构建一个本地上下文环境
+  // 构建一个本地上下文环境，该上下文对象定义了dispatch，commit，getters，state
+  // 在有命名空间和没有命名空间的情况下相应的处理方式
   const local = module.context = makeLocalContext(store, namespace, path)
 
+  // 以下对模块中配置的mutaions,actions, getters进行注册
   module.forEachMutation((mutation, key) => {
     const namespacedType = namespace + key
     registerMutation(store, namespacedType, mutation, local)
@@ -353,6 +364,7 @@ function installModule (store, rootState, path, module, hot) {
     registerGetter(store, namespacedType, getter, local)
   })
 
+  // 安装子模块
   module.forEachChild((child, key) => {
     installModule(store, rootState, path.concat(key), child, hot)
   })
@@ -361,10 +373,21 @@ function installModule (store, rootState, path, module, hot) {
 /**
  * make localized dispatch, commit, getters and state
  * if there is no namespace, just use root ones
+ 创建一个本地上下文环境
+ 参数： store: Store实例对象， namespace: 命名空间， path： 模块的访问路径
+ 返回一个上下文环境对象，该对象拥有：
+ dispatch，commit，getters，state属性方法
  */
 function makeLocalContext (store, namespace, path) {
   const noNamespace = namespace === ''
 
+  // 定义一个local对象，
+  // 对象的dispatch属性： 如果没有命名空间，直接指向根store的dispatch方法，
+  //  否者创建一个新的函数, 该函数会先统一不同的风格，type拼接上命名空间之后，
+  //  再调用store上的dispatch方法
+  // 对象的commit属性：如果没有命名空间，直接指向根store的commit方法，
+  //  否者创建一个新的函数，该函数会先统一不同的风格，type拼接上命名空间之后，
+  //  再调用store上的dispatch方法
   const local = {
     dispatch: noNamespace ? store.dispatch : (_type, _payload, _options) => {
       const args = unifyObjectStyle(_type, _payload, _options)
@@ -372,6 +395,7 @@ function makeLocalContext (store, namespace, path) {
       let { type } = args
 
       if (!options || !options.root) {
+        // 类型加上命名空间
         type = namespace + type
         if (process.env.NODE_ENV !== 'production' && !store._actions[type]) {
           console.error(`[vuex] unknown local action type: ${args.type}, global type: ${type}`)
@@ -379,6 +403,7 @@ function makeLocalContext (store, namespace, path) {
         }
       }
 
+      // type加上命名空间之后，调用store上的dispatch 
       return store.dispatch(type, payload)
     },
 
@@ -401,6 +426,9 @@ function makeLocalContext (store, namespace, path) {
 
   // getters and state object must be gotten lazily
   // because they will be changed by vm update
+  // 在local对象上定义getters方法属性，如果没有命名空间，则定义一个函数直接返回store的getters,
+  //  否者，定义一个函数，
+  // 在local对象上定义一个state方法属性，该方法
   Object.defineProperties(local, {
     getters: {
       get: noNamespace
@@ -415,20 +443,26 @@ function makeLocalContext (store, namespace, path) {
   return local
 }
 
+// 在有命名空间的情况下，创建一个本地的getters环境，
+// 
 function makeLocalGetters (store, namespace) {
   const gettersProxy = {}
 
   const splitPos = namespace.length
+  // 遍历store上的getters
   Object.keys(store.getters).forEach(type => {
     // skip if the target getter is not match this namespace
+    // 如果目标getter没有匹配当前的命名空间，跳过
     if (type.slice(0, splitPos) !== namespace) return
 
     // extract local getter type
+  // 提取本地getter的类型
     const localType = type.slice(splitPos)
 
     // Add a port to the getters proxy.
     // Define as getter property because
     // we do not want to evaluate the getters in this time.
+    // 增加代理，即访问本地getter的type时，实际上访问的是store上getters同名的type
     Object.defineProperty(gettersProxy, localType, {
       get: () => store.getters[type],
       enumerable: true
@@ -438,6 +472,8 @@ function makeLocalGetters (store, namespace) {
   return gettersProxy
 }
 
+// 注册mutation
+// 
 function registerMutation (store, type, handler, local) {
   const entry = store._mutations[type] || (store._mutations[type] = [])
   entry.push(function wrappedMutationHandler (payload) {
@@ -445,6 +481,7 @@ function registerMutation (store, type, handler, local) {
   })
 }
 
+// 注册action
 function registerAction (store, type, handler, local) {
   const entry = store._actions[type] || (store._actions[type] = [])
   entry.push(function wrappedActionHandler (payload, cb) {
@@ -470,6 +507,9 @@ function registerAction (store, type, handler, local) {
   })
 }
 
+// 注册getter：在store的_wrappedGetters属性上定义与开发者定义的getter同名函数，该函数
+// 会传进local state ， local getters, root state, root getters参数去执行开发者定义
+// 的getter函数，并返回执行的结果
 function registerGetter (store, type, rawGetter, local) {
   if (store._wrappedGetters[type]) {
     if (process.env.NODE_ENV !== 'production') {
@@ -478,6 +518,8 @@ function registerGetter (store, type, rawGetter, local) {
     return
   }
   store._wrappedGetters[type] = function wrappedGetter (store) {
+    // 返回开发者定义的getter函数执行的结果，
+    // 开发者的getter函数的参数：本地的state，本地的getters，根state，根getters
     return rawGetter(
       local.state, // local state
       local.getters, // local getters
@@ -495,12 +537,19 @@ function enableStrictMode (store) {
   }, { deep: true, sync: true })
 }
 
+// state 的实现，根据模块的访问路径，
+// 通过该路径，找到相应的模块，然后返回该模块的state，
+// 如果是根模块，直接返回根模块的state
 function getNestedState (state, path) {
   return path.length
     ? path.reduce((state, key) => state[key], state)
     : state
 }
 
+// 统一对象风格
+// 在vuex的commit，dispatch方法中，参数可以是一个对象，也可以是分开传进mutations的type
+// 和要提交的值，该方法就是用来统一这两种风格的，即统一获取到type，payload(传进的数据)，
+// 如： store.commit({type: 'add', data: 1})
 function unifyObjectStyle (type, payload, options) {
   if (isObject(type) && type.type) {
     options = payload
