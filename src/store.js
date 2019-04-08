@@ -12,6 +12,35 @@ let Vue // bind on install
       _modules，_actions，_watcherVM，_mutations，_subscribers，dispatch，commit，
       state存储器属性，watch等等。
  */
+ /*
+  options = {
+    // 根模块
+    getters: {
+      rootgetter: () => {}
+    },
+    actions: {
+      rootaction: () => {
+  
+      }
+    },
+    state: {
+      rootstate: '111'
+    },
+    mutations: {
+      rootmutation: () => {}
+    },
+    modules: {
+      // 子模块
+      a: {
+        namespaced: true,
+        state,
+        getters,
+        actions,
+        mutations
+      }
+    }
+  }
+ */
 export class Store {
   constructor (options = {}) {
     // Auto install if it is not done yet and `window` has `Vue`.
@@ -57,7 +86,7 @@ export class Store {
     // strict mode
     this.strict = strict
 
-    
+    // 根模块的state
     const state = this._modules.root.state
 
     // init root module.
@@ -325,6 +354,13 @@ function resetStoreVM (store, state, hot) {
 function installModule (store, rootState, path, module, hot) {
   const isRoot = !path.length
   // 获取当前路径对应的模块的命名空间：命名空间由模块key和/组成的字符串
+  /* 如： new Vuex({
+    modules: {
+      a: moduleA
+    }
+  })
+  如果moduleA中设置命名空间为true的话，则moduleA的命名空间为'a/'
+  */
   const namespace = store._modules.getNamespace(path)
 
   // register in namespace map
@@ -404,6 +440,7 @@ function makeLocalContext (store, namespace, path) {
       }
 
       // type加上命名空间之后，调用store上的dispatch 
+      // type: 有命名空间是 type => a/moduleAmutation
       return store.dispatch(type, payload)
     },
 
