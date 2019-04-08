@@ -38,7 +38,7 @@ export class Store {
     this._actionSubscribers = []
     this._mutations = Object.create(null)
     this._wrappedGetters = Object.create(null)
-    // 构建模块树
+    // 初始化模块，构建模块树
     this._modules = new ModuleCollection(options)
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []
@@ -57,11 +57,13 @@ export class Store {
     // strict mode
     this.strict = strict
 
+    
     const state = this._modules.root.state
 
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
+    // 安装模块，目的是对模块中的state，getters，mutations，actions做初始化工作
     installModule(this, state, [], this._modules.root)
 
     // initialize the store vm, which is responsible for the reactivity
@@ -87,6 +89,7 @@ export class Store {
     }
   }
 
+  // 原型上的commit方法
   commit (_type, _payload, _options) {
     // check object-style commit
     const {
@@ -121,6 +124,7 @@ export class Store {
     }
   }
 
+  // 原型上的dispatch方法
   dispatch (_type, _payload) {
     // check object-style dispatch
     const {
@@ -303,16 +307,25 @@ function resetStoreVM (store, state, hot) {
   }
 }
 
+// 定义安装模块的函数
+/*
+  参数： store: Store实例对象，rootState: 根模块的state, path:模块访问的路径，module：当前模块
+          hot: 是否热更新
+
+ */
 function installModule (store, rootState, path, module, hot) {
   const isRoot = !path.length
+  // 获取当前路径对应的模块的命名空间：命名空间由模块key和/组成的字符串
   const namespace = store._modules.getNamespace(path)
 
   // register in namespace map
+  // 建立命名空间到相应模块的映射表，目的：能够根据命名空间快速找到对应的模块
   if (module.namespaced) {
     store._modulesNamespaceMap[namespace] = module
   }
 
   // set state
+  // 如果不是根模块并且不是热更新
   if (!isRoot && !hot) {
     const parentState = getNestedState(rootState, path.slice(0, -1))
     const moduleName = path[path.length - 1]
@@ -321,6 +334,7 @@ function installModule (store, rootState, path, module, hot) {
     })
   }
 
+  // 构建一个本地上下文环境
   const local = module.context = makeLocalContext(store, namespace, path)
 
   module.forEachMutation((mutation, key) => {

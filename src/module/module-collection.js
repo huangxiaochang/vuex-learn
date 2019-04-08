@@ -25,10 +25,13 @@ export default class ModuleCollection {
     }, this.root)
   }
 
+  // 获取模块的命名空间
+  // 返回由模块名(/隔开)组成的字符串，根模块的命名空间默认为''
   getNamespace (path) {
     let module = this.root
     return path.reduce((namespace, key) => {
       module = module.getChild(key)
+      // key可以认为是模块名
       return namespace + (module.namespaced ? key + '/' : '')
     }, '')
   }
