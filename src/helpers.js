@@ -143,7 +143,7 @@ function normalizeMap (map) {
  * @param {Function} fn
  * @return {Function}
  */
-// 规范命名空间参数
+// 规范命名空间参数，即把mapxxx的传参统一成一种形式
 function normalizeNamespace (fn) {
   return (namespace, map) => {
     if (typeof namespace !== 'string') {
