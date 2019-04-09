@@ -16,10 +16,10 @@ let Vue // bind on install
   options = {
     // 根模块
     getters: {
-      rootgetter: () => {}
+      rootgetter: (state) => {}
     },
     actions: {
-      rootaction: () => {
+      rootaction: ({commit}, data) => {
   
       }
     },
@@ -36,7 +36,9 @@ let Vue // bind on install
         state,
         getters,
         actions,
-        mutations
+        mutations: {
+          a_mutation: (state, data) => {}
+        }
       }
     }
   }
@@ -71,9 +73,11 @@ export class Store {
     this._modules = new ModuleCollection(options)
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []
+    // 创建一个Vue实例，利用$watch来监听store数据的变化
     this._watcherVM = new Vue()
 
     // bind commit and dispatch to self
+    // 把dispatch,commit函数中的this绑定为Store实例对象store
     const store = this
     const { dispatch, commit } = this
     this.dispatch = function boundDispatch (type, payload) {
@@ -100,7 +104,7 @@ export class Store {
     // 初始化store._vm,该属性负责state的响应式
     resetStoreVM(this, state)
 
-    // apply plugins
+    // apply plugins，插件的应用，把Store实例对象store作为参数传入
     plugins.forEach(plugin => plugin(this))
 
     const useDevtools = options.devtools !== undefined ? options.devtools : Vue.config.devtools
@@ -109,17 +113,21 @@ export class Store {
     }
   }
 
+  // 设置存储器属性state，即我们访问store.state时，实际上访问的是
+  // store._vm._data.$$state。（在构造函数中，会把state当做Vue的data选项创建了一个Vue实例对象）
   get state () {
     return this._vm._data.$$state
   }
 
+  // 确保store.state为只读属性
   set state (v) {
     if (process.env.NODE_ENV !== 'production') {
       assert(false, `use store.replaceState() to explicit replace store state.`)
     }
   }
 
-  // 原型上的commit方法
+  // 原型上的commit方法，因为在构造函数中，已经绑定了commit内部的this指向了Store实例对象store，
+  // 所以commit方法的内部的this指向的是store
   commit (_type, _payload, _options) {
     // check object-style commit
     const {
@@ -257,6 +265,9 @@ export class Store {
     resetStore(this, true)
   }
 
+  // 用于控制state的修改只能是通过mutation来修改，原理是内部的修改会在fn中修改state,
+  // 会首先设置_committing为true,所以当state变化的时候，判断_committing是否为true，如果
+  // 为true，则为内部通过mutation修改的，否者为外部其他形式的修改，会进行错误的提醒。
   _withCommit (fn) {
     const committing = this._committing
     this._committing = true
@@ -294,6 +305,7 @@ function resetStore (store, hot) {
 // 来实现。
 
 function resetStoreVM (store, state, hot) {
+  // 获取旧的Vue实例对象
   const oldVm = store._vm
 
   // bind store public getters
@@ -308,6 +320,10 @@ function resetStoreVM (store, state, hot) {
     // direct inline function use will lead to closure preserving oldVm.
     // using partial to return function with only arguments preserved in closure enviroment.
     computed[key] = partial(fn, store)
+    // computed[key] = () => fn(store)
+    // 设置代理，让this.$store.getters.xxxgetter => store.vm.xxxgetter，vm.xxxgetter即为vm的计算属性，也就是实际
+    // 上访问computed[xxxgetter],在执行computed[xxxgetter]时，会执行对应的rawGetter方法（开发者定义的getter），开发者
+    // 在rawGetter中会访问store.state,实际访问的是store._vm._data.$$state
     Object.defineProperty(store.getters, key, {
       get: () => store._vm[key],
       enumerable: true // for local getters
@@ -319,6 +335,9 @@ function resetStoreVM (store, state, hot) {
   // some funky global mixins
   const silent = Vue.config.silent
   Vue.config.silent = true
+  // 创建一个Vue实例，因为Vue实例中data选项是响应式的，所以经过以下的设置之后，state就变成了
+  // 响应式的数据。然后由于同时把getters中的选项定义成了计算属性，所以在getters中依赖的state发生
+  // 变化的时候，计算属性中订阅者会得到通知，并进行相应的操作
   store._vm = new Vue({
     data: {
       $$state: state
@@ -332,6 +351,7 @@ function resetStoreVM (store, state, hot) {
     enableStrictMode(store)
   }
 
+  // 销毁旧的Vue实例对象
   if (oldVm) {
     if (hot) {
       // dispatch changes in all subscribed watchers
@@ -344,7 +364,9 @@ function resetStoreVM (store, state, hot) {
   }
 }
 
-// 定义安装模块的函数，实际上是对模块的state，getters，actions，mutations进行初始化工作
+// 定义安装模块的函数，实际上是对模块的state，getters，actions，mutations进行初始化工作,
+//  即在store的_actions,_mutations,_wrappedGetters属性中建立开发者相应的配置的对应关系.(有命名空间时，
+//  会根据模块注册的路径调整命名)
 // 并且递归安装所有的子模块
 /*
   参数： store: Store实例对象，rootState: 根模块的state, path:模块访问的路径，module：当前模块
@@ -375,11 +397,12 @@ function installModule (store, rootState, path, module, hot) {
     const parentState = getNestedState(rootState, path.slice(0, -1))
     const moduleName = path[path.length - 1]
     store._withCommit(() => {
+      // 作用：设置store.rootstate.modulea.state
       Vue.set(parentState, moduleName, module.state)
     })
   }
 
-  // 构建一个本地上下文环境，该上下文对象定义了dispatch，commit，getters，state
+  // 在模块中构建一个本地上下文环境，该上下文对象定义了dispatch，commit，getters，state，该上下文存储在模块的context属性中
   // 在有命名空间和没有命名空间的情况下相应的处理方式
   const local = module.context = makeLocalContext(store, namespace, path)
 
@@ -390,6 +413,7 @@ function installModule (store, rootState, path, module, hot) {
   })
 
   module.forEachAction((action, key) => {
+    // 如果action中配置了root: true,则直接注册到根store的_actions中，不需要通过命名空间来调整命名
     const type = action.root ? key : namespace + key
     const handler = action.handler || action
     registerAction(store, type, handler, local)
@@ -509,7 +533,7 @@ function makeLocalGetters (store, namespace) {
   return gettersProxy
 }
 
-// 注册mutation
+// 注册mutation，即把开发者定义的nutation设置到store._mutations中
 // 
 function registerMutation (store, type, handler, local) {
   const entry = store._mutations[type] || (store._mutations[type] = [])
@@ -518,10 +542,11 @@ function registerMutation (store, type, handler, local) {
   })
 }
 
-// 注册action
+// 注册action，即把开发者定义的action设置到store._actions中
 function registerAction (store, type, handler, local) {
   const entry = store._actions[type] || (store._actions[type] = [])
   entry.push(function wrappedActionHandler (payload, cb) {
+    // 执行开发者定义的action
     let res = handler.call(store, {
       dispatch: local.dispatch,
       commit: local.commit,
@@ -530,9 +555,14 @@ function registerAction (store, type, handler, local) {
       rootGetters: store.getters,
       rootState: store.state
     }, payload, cb)
+
+    // 如果得到的结果不是一个promise，则包装成一个promise
     if (!isPromise(res)) {
       res = Promise.resolve(res)
     }
+
+    // 返回结果
+    // 当devtools开启时，让它能捕获promise的报错
     if (store._devtoolHook) {
       return res.catch(err => {
         store._devtoolHook.emit('vuex:error', err)

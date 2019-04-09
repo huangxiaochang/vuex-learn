@@ -1,3 +1,7 @@
+/*
+  该文件主要是提供各种辅助函数来操作store的各种属性，
+  所以mapxxx辅助函数实际上是操作store的语法糖
+*/
 /**
  * Reduce the code which written in Vue.js for getting the state.
  * @param {String} [namespace] - Module's namespace
@@ -139,6 +143,7 @@ function normalizeMap (map) {
  * @param {Function} fn
  * @return {Function}
  */
+// 规范命名空间参数
 function normalizeNamespace (fn) {
   return (namespace, map) => {
     if (typeof namespace !== 'string') {
