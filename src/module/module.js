@@ -23,18 +23,22 @@ export default class Module {
     this.state = (typeof rawState === 'function' ? rawState() : rawState) || {}
   }
 
+  // 获取该模块是否定义了命名空间
   get namespaced () {
     return !!this._rawModule.namespaced
   }
 
+  // 在该模块中添加一个子模块
   addChild (key, module) {
     this._children[key] = module
   }
 
+  // 在该模块中移除一个子模块
   removeChild (key) {
     delete this._children[key]
   }
 
+  // 获取该模块中的一个子模块
   getChild (key) {
     return this._children[key]
   }
@@ -54,22 +58,26 @@ export default class Module {
     }
   }
 
+  // 提供遍历该模块的所有子模块的接口，会把值和键作为参数执行遍历的回调函数
   forEachChild (fn) {
     forEachValue(this._children, fn)
   }
 
+  // 提供遍历该模块中定义的getters，会把值和键作为参数执行遍历的回调函数
   forEachGetter (fn) {
     if (this._rawModule.getters) {
       forEachValue(this._rawModule.getters, fn)
     }
   }
 
+  // 提供遍历该模块中定义的actions，会把值和键作为参数执行遍历的回调函数
   forEachAction (fn) {
     if (this._rawModule.actions) {
       forEachValue(this._rawModule.actions, fn)
     }
   }
 
+  // 提供遍历该模块中定义的mutations，会把值和键作为参数执行遍历的回调函数
   forEachMutation (fn) {
     if (this._rawModule.mutations) {
       forEachValue(this._rawModule.mutations, fn)

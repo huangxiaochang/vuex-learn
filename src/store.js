@@ -65,13 +65,12 @@ export class Store {
 
     // store internal state
     this._committing = false
-    this._actions = Object.create(null)
+    this._actions = Object.create(null) // 存储经过处理后开发者定义的actions
     this._actionSubscribers = []
-    this._mutations = Object.create(null)
-    this._wrappedGetters = Object.create(null)
-    // 初始化模块，构建模块树
-    this._modules = new ModuleCollection(options)
-    this._modulesNamespaceMap = Object.create(null)
+    this._mutations = Object.create(null) // 存储经过处理后开发者定义的mutations
+    this._wrappedGetters = Object.create(null) //存储经过处理后开发者定义的getters
+    this._modules = new ModuleCollection(options) // 初始化模块，构建模块树
+    this._modulesNamespaceMap = Object.create(null) // 存储有命名空间到模块之间的映射表
     this._subscribers = []
     // 创建一个Vue实例，利用$watch来监听store数据的变化
     this._watcherVM = new Vue()
@@ -231,32 +230,43 @@ export class Store {
     })
   }
 
+  // 提供了动态注册一个新的模块
   registerModule (path, rawModule, options = {}) {
     if (typeof path === 'string') path = [path]
 
+    // 注册模块的路径只能是字符串或者数组，并且只能动态注册非根模块
     if (process.env.NODE_ENV !== 'production') {
       assert(Array.isArray(path), `module path must be a string or an Array.`)
       assert(path.length > 0, 'cannot register the root module by using registerModule.')
     }
 
+    // 把新的模块加入模块树中
     this._modules.register(path, rawModule)
+    // 然后注册新加进来的模块
     installModule(this, this.state, path, this._modules.get(path), options.preserveState)
     // reset store to update getters...
+    // 重新实例化store._vm
     resetStoreVM(this, this.state)
   }
 
+  // 动态取消注册模块
   unregisterModule (path) {
     if (typeof path === 'string') path = [path]
 
+    // 取消的模块的路径只能是字符串或者数组
     if (process.env.NODE_ENV !== 'production') {
       assert(Array.isArray(path), `module path must be a string or an Array.`)
     }
 
+    // 在模块树种取消注册该模块
     this._modules.unregister(path)
+    // 删除state访问路径中药删除的模块的state
     this._withCommit(() => {
       const parentState = getNestedState(this.state, path.slice(0, -1))
       Vue.delete(parentState, path[path.length - 1])
     })
+    // 重置store，即把store的_actions、_mutations、_wrappedGetters 和 _modulesNamespaceMap 都清空，
+    // 然后重新执行 installModule 安装所有模块以及 resetStoreVM 重置 store._vm
     resetStore(this)
   }
 
@@ -288,6 +298,8 @@ function genericSubscribe (fn, subs) {
   }
 }
 
+// 把store的_actions、_mutations、_wrappedGetters 和 _modulesNamespaceMap 都清空，
+// 然后重新执行 installModule 安装所有模块以及 resetStoreVM 重置 store._vm
 function resetStore (store, hot) {
   store._actions = Object.create(null)
   store._mutations = Object.create(null)
@@ -371,6 +383,16 @@ function resetStoreVM (store, state, hot) {
 /*
   参数： store: Store实例对象，rootState: 根模块的state, path:模块访问的路径，module：当前模块
           hot: 是否热更新
+  安装模块：
+    1.在store上建立命名空间到模块之间的映射表
+    2.设置模块的context属性，该属性包含dispatch,commit,getters,state的处理方式，目的是
+      在执行开发者定义的dispatch,commit,gettres,actions,mutations时，能够传进相应的state,
+      getters,commit等参数
+    3.设置store.state属性，即支持通过store.state和模块名，访问到相应模块的state属性
+    4.注册模块中mutations： 即在store的_mutations属性中加入经过传参，命名空间处理后的开发者定义的mutations
+    5.注册模块中actions： 即在store的_actions属性中加入经过传参，命名空间处理后的开发者定义的actions
+    6.注册模块中getters： 即在store的_wrappedGetters属性中加入经过传参，命名空间处理后的getters
+    7.递归注册子模块
 
  */
 function installModule (store, rootState, path, module, hot) {
@@ -488,7 +510,7 @@ function makeLocalContext (store, namespace, path) {
   // getters and state object must be gotten lazily
   // because they will be changed by vm update
   // 在local对象上定义getters方法属性，如果没有命名空间，则定义一个函数直接返回store的getters,
-  //  否者，定义一个函数，
+  //  否者，定义一个函数，该函数会先根据命名空间找到store.getters相应的getter返回
   // 在local对象上定义一个state方法属性，该方法
   Object.defineProperties(local, {
     getters: {
@@ -497,6 +519,7 @@ function makeLocalContext (store, namespace, path) {
         : () => makeLocalGetters(store, namespace)
     },
     state: {
+      // getNestedState会根据模块访问路径，返回相应模块的state
       get: () => getNestedState(store.state, path)
     }
   })

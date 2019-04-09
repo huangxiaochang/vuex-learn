@@ -3,7 +3,9 @@ import { assert, forEachValue } from '../util'
 
 // 定义构建模块树的类
 // ModuleCollection类的作用是根据开发者定义的options中的模块，
-// 构建一个模块树，每个模块中由_children属性收集着所有的子模块
+// 构建一个模块树，由roor属性指向根模块，每个模块中由_children属性收集着所有的子模块，
+// 同时提供了在模块树中注册一个新模块和取消注册一个模块的方法，根据路径来或者模块树中
+// 的某个模块的方法，更新整个模块树的方法
 export default class ModuleCollection {
   constructor (rawRootModule) {
     // register root module (Vuex.Store options)
@@ -36,6 +38,7 @@ export default class ModuleCollection {
     }, '')
   }
 
+  // 提供更新模块树的接口
   update (rawRootModule) {
     update([], this.root, rawRootModule)
   }
@@ -69,7 +72,7 @@ export default class ModuleCollection {
     }
   }
 
-  // 取消注册一个模块
+  // 取消注册一个模块，即把相应的模块从父模块的_children属性中移除
   unregister (path) {
     const parent = this.get(path.slice(0, -1))
     const key = path[path.length - 1]
@@ -79,6 +82,7 @@ export default class ModuleCollection {
   }
 }
 
+// 更新模块树的函数，即替换模块_rawModule属性的_actions等值
 function update (path, targetModule, newModule) {
   if (process.env.NODE_ENV !== 'production') {
     assertRawModule(path, newModule)
@@ -88,8 +92,10 @@ function update (path, targetModule, newModule) {
   targetModule.update(newModule)
 
   // update nested modules
+  // 更新子模块
   if (newModule.modules) {
     for (const key in newModule.modules) {
+      // 不能通过更新来注册一个新的模块, 只能更新原模块树中已经存在的模块
       if (!targetModule.getChild(key)) {
         if (process.env.NODE_ENV !== 'production') {
           console.warn(
@@ -108,11 +114,13 @@ function update (path, targetModule, newModule) {
   }
 }
 
+// 函数断言
 const functionAssert = {
   assert: value => typeof value === 'function',
   expected: 'function'
 }
 
+// 对象断言
 const objectAssert = {
   assert: value => typeof value === 'function' ||
     (typeof value === 'object' && typeof value.handler === 'function'),
