@@ -125,7 +125,7 @@ export class Store {
     }
   }
 
-  // 原型上的commit方法，因为在构造函数中，已经绑定了commit内部的this指向了Store实例对象store，
+  // 原型上的commit方法，该方法用于提交一个mutation。此外因为在构造函数中，已经绑定了commit内部的this指向了Store实例对象store，
   // 所以commit方法的内部的this指向的是store
   commit (_type, _payload, _options) {
     // check object-style commit
@@ -136,6 +136,7 @@ export class Store {
     } = unifyObjectStyle(_type, _payload, _options)
 
     const mutation = { type, payload }
+    // 获取要提交的mutation
     const entry = this._mutations[type]
     if (!entry) {
       if (process.env.NODE_ENV !== 'production') {
@@ -143,11 +144,15 @@ export class Store {
       }
       return
     }
+
+    // 执行开发者定义的mutation，去修改state
     this._withCommit(() => {
       entry.forEach(function commitIterator (handler) {
         handler(payload)
       })
     })
+
+    // 执行订阅mutation的订阅者回调，闯入的参数为提交的mutation和mutation改变后的state
     this._subscribers.forEach(sub => sub(mutation, this.state))
 
     if (
@@ -161,7 +166,7 @@ export class Store {
     }
   }
 
-  // 原型上的dispatch方法
+  // 原型上的dispatch方法，该方法用于提交一个action
   dispatch (_type, _payload) {
     // check object-style dispatch
     const {
@@ -170,6 +175,8 @@ export class Store {
     } = unifyObjectStyle(_type, _payload)
 
     const action = { type, payload }
+
+    // 获取要提交的action
     const entry = this._actions[type]
     if (!entry) {
       if (process.env.NODE_ENV !== 'production') {
@@ -189,10 +196,12 @@ export class Store {
       }
     }
 
+    // 执行相应的action handler，获取执行结果，返回的是一个promise对象
     const result = entry.length > 1
       ? Promise.all(entry.map(handler => handler(payload)))
       : entry[0](payload)
 
+    // 返回promise的结果
     return result.then(res => {
       try {
         this._actionSubscribers
@@ -208,6 +217,8 @@ export class Store {
     })
   }
 
+  // 此方法用于添加订阅store的mutation的订阅者，会在每一个mutation完成后调用该订阅者，
+  // 传递给订阅者的参数分别为：接收的mutation，经过mutation改变后的state
   subscribe (fn) {
     return genericSubscribe(fn, this._subscribers)
   }
@@ -224,6 +235,7 @@ export class Store {
     return this._watcherVM.$watch(() => getter(this.state, this.getters), cb, options)
   }
 
+  // 替换store._vm实例data选项$$state的属性值
   replaceState (state) {
     this._withCommit(() => {
       this._vm._data.$$state = state
@@ -286,6 +298,7 @@ export class Store {
   }
 }
 
+// 把订阅者fn添加到收集筐subs中，并返回一个函数用于删除该订阅者fn
 function genericSubscribe (fn, subs) {
   if (subs.indexOf(fn) < 0) {
     subs.push(fn)
