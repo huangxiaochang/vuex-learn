@@ -315,12 +315,19 @@ function resetStore (store, hot) {
 // 该函数的实际作用是建立getters和state的联系，并且希望getters依赖的state
 // 能够被缓存，只有当值发生的时候，才进行重新计算，所以使用了Vue中的计算属性
 // 来实现。
-
+// 1.设置store.getters成代理属性，代理访问store._vm上的同名计算属性，该计算属性内部会调用开发者定义的getter
+// 2.创建一个Vue实例store._vm，把state当做store._vm._data.$$state的属性值，把开发者定义的getters,映射成store._vm
+//    的计算属性。这样state变成了响应式的数据，同时getter是一个计算属性，只有当state发生变化时，才会重新求值。
+// 3.严格模式下，创建一个Vue的watch来监视state的变化，当发生变化时，判断是否是内部的改变，如果不是，则错误提示。
+// 4.如果存在旧的store._vm实例，则销毁。
 function resetStoreVM (store, state, hot) {
   // 获取旧的Vue实例对象
   const oldVm = store._vm
 
   // bind store public getters
+  // 把开发者定义的getter设置到store的getters属性上，同时把该属性设置成存储器属性进行了一层代理
+  // 即访问store.getters上的属性时，实际上访问的是store._vm上的同名属性，该同名属性是store._vm的一个计算属性，
+  // 在计算属性里面，会把相应的参数传递给开发者定义的getter执行得到结果。
   store.getters = {}
   const wrappedGetters = store._wrappedGetters
   // 创建一个Vue的计算属性
@@ -345,6 +352,7 @@ function resetStoreVM (store, state, hot) {
   // use a Vue instance to store the state tree
   // suppress warnings just in case the user has added
   // some funky global mixins
+  // Vue.config.silent是否取消Vue所有的日志与警告
   const silent = Vue.config.silent
   Vue.config.silent = true
   // 创建一个Vue实例，因为Vue实例中data选项是响应式的，所以经过以下的设置之后，state就变成了
@@ -359,6 +367,9 @@ function resetStoreVM (store, state, hot) {
   Vue.config.silent = silent
 
   // enable strict mode for new vm
+  // 开启严格模式，即state的改变只能是通过mutation来改变，不能是外部其他的方式。
+  // 原理：创建Vue的$watch来监听state，state变化时，判断store._committing是否为true，如果不是，
+  // 则为非法修改，因为内部修改state，都会先把store._committing设置成true。
   if (store.strict) {
     enableStrictMode(store)
   }
@@ -619,6 +630,9 @@ function registerGetter (store, type, rawGetter, local) {
   }
 }
 
+// 开启严格模式，即创建一个Vue的watch去监听state,如果state变化的时候，store._committing属性不为
+// true的时候，即是非法的改变，因为内部改变state的时候，都会先把store._committing设置为true，修改完成后
+// 在恢复store._committing的值
 function enableStrictMode (store) {
   store._vm.$watch(function () { return this._data.$$state }, () => {
     if (process.env.NODE_ENV !== 'production') {
