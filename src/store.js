@@ -185,6 +185,7 @@ export class Store {
       return
     }
 
+    // 执行订阅action分发前的订阅者cb,传进参数action和state
     try {
       this._actionSubscribers
         .filter(sub => sub.before)
@@ -219,15 +220,19 @@ export class Store {
 
   // 此方法用于添加订阅store的mutation的订阅者，会在每一个mutation完成后调用该订阅者，
   // 传递给订阅者的参数分别为：接收的mutation，经过mutation改变后的state
+  // 常用于插件
   subscribe (fn) {
     return genericSubscribe(fn, this._subscribers)
   }
 
+  // 订阅store的action。会在每一个action分发的时候调用回调，并接受action和当前store的state作为参数。
+  // 常用于插件
   subscribeAction (fn) {
     const subs = typeof fn === 'function' ? { before: fn } : fn
     return genericSubscribe(subs, this._actionSubscribers)
   }
 
+  // 响应式地侦听getter的返回值，当值发生变化时，调用回调cb, options参数为Vue.$watch方法的参数
   watch (getter, cb, options) {
     if (process.env.NODE_ENV !== 'production') {
       assert(typeof getter === 'function', `store.watch only accepts a function.`)
@@ -257,7 +262,7 @@ export class Store {
     // 然后注册新加进来的模块
     installModule(this, this.state, path, this._modules.get(path), options.preserveState)
     // reset store to update getters...
-    // 重新实例化store._vm
+    // 重新实例化store._vm，因为要把新增的state，getter变成响应式
     resetStoreVM(this, this.state)
   }
 
@@ -282,6 +287,7 @@ export class Store {
     resetStore(this)
   }
 
+  // 热更新
   hotUpdate (newOptions) {
     this._modules.update(newOptions)
     resetStore(this, true)

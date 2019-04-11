@@ -8,10 +8,12 @@
  * @param {Object|Array} states # Object's item can be a function which accept state and getters for param, you can do something for state and getters in it.
  * @param {Object}
  */
+// mapState辅助函数实现方便注入store的state
 export const mapState = normalizeNamespace((namespace, states) => {
   const res = {}
   normalizeMap(states).forEach(({ key, val }) => {
     res[key] = function mappedState () {
+      // 获取对应的state和getters
       let state = this.$store.state
       let getters = this.$store.getters
       if (namespace) {
@@ -38,6 +40,7 @@ export const mapState = normalizeNamespace((namespace, states) => {
  * @param {Object|Array} mutations # Object's item can be a function which accept `commit` function as the first param, it can accept anthor params. You can commit mutation and do any other things in this function. specially, You need to pass anthor params from the mapped function.
  * @return {Object}
  */
+// 方便注入mutations
 export const mapMutations = normalizeNamespace((namespace, mutations) => {
   const res = {}
   normalizeMap(mutations).forEach(({ key, val }) => {
@@ -117,6 +120,8 @@ export const mapActions = normalizeNamespace((namespace, actions) => {
  * Rebinding namespace param for mapXXX function in special scoped, and return them by simple object
  * @param {String} namespace
  * @return {Object}
+ * 创建基于命名空间的组件绑定辅助函数。其返回一个包含 mapState、mapGetters、mapActions 和 mapMutations 的对象。
+ * 它们都已经绑定在了给定的命名空间上。
  */
 export const createNamespacedHelpers = (namespace) => ({
   mapState: mapState.bind(null, namespace),
@@ -143,7 +148,18 @@ function normalizeMap (map) {
  * @param {Function} fn
  * @return {Function}
  */
-// 规范命名空间参数，即把mapxxx的传参统一成一种形式
+// 规范命名空间参数，即把mapxxx的传参统一成一种形式。如：
+/*
+  ...mapGetter([
+    'a/add',
+    'a/reduce'
+  ])
+  或者
+  ...mapGetter('a',[
+    'add',
+    'reduce'
+  ])
+ */
 function normalizeNamespace (fn) {
   return (namespace, map) => {
     if (typeof namespace !== 'string') {
