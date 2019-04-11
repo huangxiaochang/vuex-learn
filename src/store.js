@@ -66,12 +66,12 @@ export class Store {
     // store internal state
     this._committing = false
     this._actions = Object.create(null) // 存储经过处理后开发者定义的actions
-    this._actionSubscribers = []
+    this._actionSubscribers = [] // 收集监听actions的订阅者
     this._mutations = Object.create(null) // 存储经过处理后开发者定义的mutations
     this._wrappedGetters = Object.create(null) //存储经过处理后开发者定义的getters
     this._modules = new ModuleCollection(options) // 初始化模块，构建模块树
     this._modulesNamespaceMap = Object.create(null) // 存储有命名空间到模块之间的映射表
-    this._subscribers = []
+    this._subscribers = [] // 收集订阅mutations的订阅者
     // 创建一个Vue实例，利用$watch来监听store数据的变化
     this._watcherVM = new Vue()
 
