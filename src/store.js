@@ -58,6 +58,9 @@ export class Store {
       assert(this instanceof Store, `store must be called with the new operator.`)
     }
 
+    // 获取插件、严格模式的配置项
+    // 插件：vuex的插件就是一个函数，第一个参数为store.会在store初始化后被调用。
+    // 严格模式下，状态的变更如果不是由mutation函数引起，将会抛出异常
     const {
       plugins = [],
       strict = false
@@ -69,7 +72,8 @@ export class Store {
     this._actionSubscribers = [] // 收集监听actions的订阅者
     this._mutations = Object.create(null) // 存储经过处理后开发者定义的mutations
     this._wrappedGetters = Object.create(null) //存储经过处理后开发者定义的getters
-    this._modules = new ModuleCollection(options) // 初始化模块，构建模块树
+    // 初始化模块，构建模块树,并提供了修改，新增，获取模块，模块树的接口等
+    this._modules = new ModuleCollection(options) 
     this._modulesNamespaceMap = Object.create(null) // 存储有命名空间到模块之间的映射表
     this._subscribers = [] // 收集订阅mutations的订阅者
     // 创建一个Vue实例，利用$watch来监听store数据的变化
@@ -95,14 +99,17 @@ export class Store {
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
-    // 安装模块，目的是对模块中的state，getters，mutations，actions做初始化工作
-    installModule(this, state, [], this._modules.root)
+    // 安装模块，目的是对模块中的state，getters，mutations，actions做初始化工作,把他们定义到store
+    // 的相应属性中，同时绑定了他们的执行上下文和参数的传递
 
+    installModule(this, state, [], this._modules.root)
+    
     // initialize the store vm, which is responsible for the reactivity
     // (also registers _wrappedGetters as computed properties)
-    // 初始化store._vm,该属性负责state的响应式
+    // 初始化store._vm,该属性负责state的响应式。同时在store定义getters,访问store.getters[key]
+    // 即访问store._vm上同名的计算属性，即store.getters是store._vm的同名计算属性的watcher,所以
+    // 它是响应式的
     resetStoreVM(this, state)
-
     // apply plugins，插件的应用，把Store实例对象store作为参数传入
     plugins.forEach(plugin => plugin(this))
 
@@ -129,6 +136,7 @@ export class Store {
   // 所以commit方法的内部的this指向的是store
   commit (_type, _payload, _options) {
     // check object-style commit
+    // 开发者使用commit时，可以使用对象的模式，即在commit方法中只传进一个对象
     const {
       type,
       payload,
@@ -152,7 +160,8 @@ export class Store {
       })
     })
 
-    // 执行订阅mutation的订阅者回调，闯入的参数为提交的mutation和mutation改变后的state
+    // 执行订阅mutation的订阅者回调，传入的参数为提交的mutation和mutation改变后的state。
+    // 一般用于插件中
     this._subscribers.forEach(sub => sub(mutation, this.state))
 
     if (
@@ -185,7 +194,7 @@ export class Store {
       return
     }
 
-    // 执行订阅action分发前的订阅者cb,传进参数action和state
+    // 执行订阅action分发前的订阅者cb,传进参数action：{type, payload}和state。
     try {
       this._actionSubscribers
         .filter(sub => sub.before)
@@ -204,6 +213,7 @@ export class Store {
 
     // 返回promise的结果
     return result.then(res => {
+      // 执行订阅action分发后的回调
       try {
         this._actionSubscribers
           .filter(sub => sub.after)
@@ -219,7 +229,7 @@ export class Store {
   }
 
   // 此方法用于添加订阅store的mutation的订阅者，会在每一个mutation完成后调用该订阅者，
-  // 传递给订阅者的参数分别为：接收的mutation，经过mutation改变后的state
+  // 传递给订阅者的参数分别为：接收的mutation:{type, payload}，经过mutation改变后的state
   // 常用于插件
   subscribe (fn) {
     return genericSubscribe(fn, this._subscribers)
@@ -287,9 +297,10 @@ export class Store {
     resetStore(this)
   }
 
-  // 热更新
+  // 提供热更新的接口
   hotUpdate (newOptions) {
     this._modules.update(newOptions)
+    // 重新安装模块和重新设置store._vm，即进行响应式设置
     resetStore(this, true)
   }
 
@@ -363,7 +374,7 @@ function resetStoreVM (store, state, hot) {
     // 上访问computed[xxxgetter],在执行computed[xxxgetter]时，会执行对应的rawGetter方法（开发者定义的getter），开发者
     // 在rawGetter中会访问store.state,实际访问的是store._vm._data.$$state
     Object.defineProperty(store.getters, key, {
-      get: () => store._vm[key],
+      get: () => store._vm[key], // 返回vm上的同名计算属性，即定义store.getters成_vm计算属性的watcher
       enumerable: true // for local getters
     })
   })
@@ -444,12 +455,16 @@ function installModule (store, rootState, path, module, hot) {
   }
 
   // set state
-  // 如果不是根模块并且不是热更新
+  // 如果子模块并且不是热更新
   if (!isRoot && !hot) {
+    // 获取父级state
     const parentState = getNestedState(rootState, path.slice(0, -1))
+    // 获取模块名
     const moduleName = path[path.length - 1]
+    // _withCommit使用来设置state,则可以知道是框架内部修改state
     store._withCommit(() => {
-      // 作用：设置store.rootstate.modulea.state
+      // 作用：设置store.rootstate.modulea.state。
+      // 即设置成能通过从根模块使用模块名来访问模块的state
       Vue.set(parentState, moduleName, module.state)
     })
   }
@@ -586,7 +601,7 @@ function makeLocalGetters (store, namespace) {
   return gettersProxy
 }
 
-// 注册mutation，即把开发者定义的nutation设置到store._mutations中
+// 注册mutation，即把开发者定义的mutation设置到store._mutations中
 // 
 function registerMutation (store, type, handler, local) {
   const entry = store._mutations[type] || (store._mutations[type] = [])

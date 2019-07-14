@@ -15,13 +15,15 @@
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
+import { mapState, createNamespacedHelpers } from 'vuex'
+
+const namespace = createNamespacedHelpers('cart')
 
 export default {
   computed: mapState({
     products: state => state.products.all
   }),
-  methods: mapActions('cart', [
+  methods: namespace.mapActions([
     'addProductToCart'
   ]),
   created () {

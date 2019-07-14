@@ -24,13 +24,16 @@ export default function (Vue) {
    // vuex的初始化工作，该函数会在组件实例的beforeCreate钩子函数中被调用
    // 在当前的实例对象上定义一个$store属性，该属性值为Vuex实例
   function vuexInit () {
+    // this -> vm 组件实例对象
     const options = this.$options
     // store injection
     if (options.store) {
+      // 根实例
       this.$store = typeof options.store === 'function'
         ? options.store()
         : options.store
     } else if (options.parent && options.parent.$store) {
+      // 子组件
       this.$store = options.parent.$store
     }
   }

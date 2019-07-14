@@ -3,7 +3,7 @@ import { assert, forEachValue } from '../util'
 
 // 定义构建模块树的类
 // ModuleCollection类的作用是根据开发者定义的options中的模块，
-// 构建一个模块树，由roor属性指向根模块，每个模块中由_children属性收集着所有的子模块，
+// 构建一个模块树，由root属性指向根模块，每个模块中由_children属性收集着所有的子模块，
 // 同时提供了在模块树中注册一个新模块和取消注册一个模块的方法，根据路径来或者模块树中
 // 的某个模块的方法，更新整个模块树的方法
 export default class ModuleCollection {
@@ -54,15 +54,15 @@ export default class ModuleCollection {
     // 创建一个模块
     const newModule = new Module(rawModule, runtime)
     if (path.length === 0) {
+      // 根模块
       this.root = newModule
     } else {
       // path.slice(0, -1)：path中开始到倒数第一个元素的全部元素，即不包含最后一个元素
       const parent = this.get(path.slice(0, -1))
       parent.addChild(path[path.length - 1], newModule)
     }
-
     // register nested modules
-    // 注册嵌套模块
+    // 递归注册嵌套模块
     if (rawModule.modules) {
       forEachValue(rawModule.modules, (rawChildModule, key) => {
         // concat()的参数可以是一个数组，也可以是一个具体的值，效果都是返回一个

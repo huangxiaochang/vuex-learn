@@ -24,6 +24,7 @@ export const mapState = normalizeNamespace((namespace, states) => {
         state = module.context.state
         getters = module.context.getters
       }
+      // 开发者的mapstate选项中的值可以是一个函数，该函数的参数为对应的state 和getters
       return typeof val === 'function'
         ? val.call(this, state, getters)
         : state[val]
@@ -44,6 +45,7 @@ export const mapState = normalizeNamespace((namespace, states) => {
 export const mapMutations = normalizeNamespace((namespace, mutations) => {
   const res = {}
   normalizeMap(mutations).forEach(({ key, val }) => {
+    // val -> type of mutation
     res[key] = function mappedMutation (...args) {
       // Get the commit method from store
       let commit = this.$store.commit
@@ -54,6 +56,8 @@ export const mapMutations = normalizeNamespace((namespace, mutations) => {
         }
         commit = module.context.commit
       }
+      // args -> payload of mutation param
+      // mutation type 可以是一个函数，然后在该函数中可以使用commit来提交mutation
       return typeof val === 'function'
         ? val.apply(this, [commit].concat(args))
         : commit.apply(this.$store, [val].concat(args))
@@ -98,6 +102,7 @@ export const mapGetters = normalizeNamespace((namespace, getters) => {
 export const mapActions = normalizeNamespace((namespace, actions) => {
   const res = {}
   normalizeMap(actions).forEach(({ key, val }) => {
+    // val -> type of action
     res[key] = function mappedAction (...args) {
       // get dispatch function from store
       let dispatch = this.$store.dispatch
@@ -108,6 +113,8 @@ export const mapActions = normalizeNamespace((namespace, actions) => {
         }
         dispatch = module.context.dispatch
       }
+      // args -> payload of action
+      // action type 可以是一个函数，然后可以在该函数中使用dispatch来提交action
       return typeof val === 'function'
         ? val.apply(this, [dispatch].concat(args))
         : dispatch.apply(this.$store, [val].concat(args))
