@@ -704,7 +704,9 @@ function unifyObjectStyle (type, payload, options) {
 
 // 安装vuex插件的方法
 // 1.使用全局变量Vue存储Vue构造函数，便于其他地方使用，避免了引入，减少了项目的体积
-// 2.全局（在每一个Vue实例中）注入一个beforeCreate钩子函数，在该钩子函数中进行初始化的工作
+// 2.全局（在每一个Vue实例中）注入一个beforeCreate钩子函数，在该钩子函数中进行初始化的工作，
+//  初始化：在组件的vm实例对象上定义$store属性，指向store实例对象，这样，在组件中，即可通过$store
+//  属性来访问到store实例对象。
 export function install (_Vue) {
   // 确保vuex只能安装一次
   if (Vue && _Vue === Vue) {
